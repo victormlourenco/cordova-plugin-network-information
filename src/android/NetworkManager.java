@@ -33,6 +33,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.net.ConnectivityManager;
+import android.net.wifi.WifiManager;
 import android.net.NetworkInfo;
 import android.os.Build;
 
@@ -85,6 +86,7 @@ public class NetworkManager extends CordovaPlugin {
     private CallbackContext connectionCallbackContext;
 
     ConnectivityManager sockMan;
+    WifiManager wifiMan;
     BroadcastReceiver receiver;
     private JSONObject lastInfo = null;
 
@@ -98,6 +100,7 @@ public class NetworkManager extends CordovaPlugin {
     public void initialize(CordovaInterface cordova, CordovaWebView webView) {
         super.initialize(cordova, webView);
         this.sockMan = (ConnectivityManager) cordova.getActivity().getSystemService(Context.CONNECTIVITY_SERVICE);
+        this.wifiMan = (WifiManager) cordova.getActivity().getApplicationContext().getSystemService(Context.WIFI_SERVICE);
         this.connectionCallbackContext = null;
 
         this.registerConnectivityActionReceiver();
@@ -164,7 +167,11 @@ public class NetworkManager extends CordovaPlugin {
                 public void onReceive(Context context, Intent intent) {
                     // (The null check is for the ARM Emulator, please use Intel Emulator for better results)
                     if (NetworkManager.this.webView != null) {
-                        updateConnectionInfo(sockMan.getActiveNetworkInfo());
+                        if(isSharingWiFi()) {
+                            sendUpdate(TYPE_WIFI);
+                        } else {
+                            updateConnectionInfo(sockMan.getActiveNetworkInfo());
+                        }
                     }
 
                     String connectionType = null;
@@ -207,6 +214,22 @@ public class NetworkManager extends CordovaPlugin {
                 receiver = null;
             }
         }
+    }
+
+
+    public boolean isSharingWiFi()
+    {
+        try
+        {
+            final Method method = this.wifiMan.getClass().getDeclaredMethod("isWifiApEnabled");
+            method.setAccessible(true); //in the case of visibility change in future APIs
+            return (Boolean) method.invoke(this.wifiMan);
+        }
+        catch (Exception e)
+        {
+            LOG.e(LOG_TAG, "Error checking wifi ap status: " + e.getMessage(), e);
+        }
+        return false;
     }
 
     /**
